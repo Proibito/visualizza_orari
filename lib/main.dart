@@ -5,6 +5,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart';
+import "./Eveto.dart";
+import "package:intl/intl.dart";
 
 void main() {
   runApp(MyApp());
@@ -52,62 +54,54 @@ class MyHomePage extends StatefulWidget {
   _MyHomePageState createState() => _MyHomePageState();
 }
 
+class Lezioni {
+  final String title;
+  final DateTime oraInizio;
+  final DateTime oraFine;
+
+  const Lezioni(this.title, this.oraInizio, this.oraFine);
+}
+
 class _MyHomePageState extends State<MyHomePage> {
   CalendarFormat _calendarFormat = CalendarFormat.month;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
-  String _responseText = '';
+
+  // CalendarController _calendarController = CalendarController();
+  var lezioni = <Lezioni>[];
+
+  String inizio = "";
+  String fine = "";
+  late final PageController _pageController;
 
   Future<void> _makePostRequest() async {
-    print(_selectedDay);
+    lezioni = <Lezioni>[];
+
     final url = Uri.parse(
         'https://apache.prod.up.cineca.it/api/Impegni/getImpegniCalendarioPubblico');
     final headers = {'Content-Type': 'application/json'};
+    print(inizio);
+    print(fine);
     final body = jsonEncode({
       'mostraImpegniAnnullati': true,
       'mostraIndisponibilitaTotali': false,
       'linkCalendarioId': '613b940fda7aec0018faeede',
       'clienteId': '5852fd1ab7305612a8354d51',
       'pianificazioneTemplate': false,
-      'dataInizio': '2023-02-26T23:00:00.000Z',
-      'dataFine': '2023-03-03T23:00:00.000Z',
+      'dataInizio': inizio,
+      'dataFine': fine,
     });
     final response = await http.post(url, headers: headers, body: body);
     setState(() {
-      _responseText = response.body;
-
       var res = json.decode(response.body);
       int giro = 0;
-      for(var test in res){
+      for (var test in res) {
         giro++;
-        print("giro: "+ giro.toString());
+        lezioni.add(Lezioni(test["nome"], DateTime.parse(test["dataInizio"]),
+            DateTime.parse(test["dataFine"])));
       }
-      print("sium  " + res[0]["dataInizio"]);
-
     });
   }
-
-  final List<Map<String, String>> myList = [
-    {
-      'title': 'Elemento 1',
-      'description': 'Descrizione dell\'elemento 1',
-    },
-    {
-      'title': 'Elemento 2',
-      'description': 'Descrizione dell\'elemento 2',
-    },
-    {
-      'title': 'Elemento 3',
-      'description': 'Descrizione dell\'elemento 3',
-    },
-  ];
-
-  String ottieniDato() {
-    return "ciao";
-  }
-
-  final List<String> entries = <String>['A', 'B', 'C'];
-  final List<int> colorCodes = <int>[600, 500, 100];
 
   @override
   Widget build(BuildContext context) {
@@ -120,11 +114,12 @@ class _MyHomePageState extends State<MyHomePage> {
           children: [
             TableCalendar(
               calendarFormat: _calendarFormat,
-              focusedDay: _focusedDay,
-              firstDay: DateTime(2021),
-              lastDay: DateTime(2030),
+              firstDay: DateTime.utc(2010, 10, 16),
+              lastDay: DateTime.utc(2030, 3, 14),
+              focusedDay: DateTime.now(),
               locale: Localizations.localeOf(context).languageCode,
               startingDayOfWeek: StartingDayOfWeek.monday,
+              onCalendarCreated: (controller) => _pageController = controller,
               eventLoader: (date) {
                 if (date.weekday == DateTime.monday) {
                   return ["sium", "un altro"];
@@ -140,10 +135,20 @@ class _MyHomePageState extends State<MyHomePage> {
                 return isSameDay(_selectedDay, day);
               },
               onDaySelected: (selectedDay, focusedDay) {
-                setState(() {
-                  _selectedDay = selectedDay;
-                  _focusedDay = focusedDay;
-                });
+                inizio = DateTime.utc(focusedDay.year, focusedDay.month, 1)
+                    .toString();
+                fine = DateTime.utc(focusedDay.year, focusedDay.month, 31)
+                    .toString();
+                print(DateFormat.yMMMd("it").format(DateTime.now()));
+                _makePostRequest();
+
+                if (!isSameDay(_selectedDay, selectedDay)) {
+                  // Call `setState()` when updating the selected day
+                  setState(() {
+                    _selectedDay = selectedDay;
+                    _focusedDay = focusedDay;
+                  });
+                }
               },
               onFormatChanged: (format) {
                 setState(() {
@@ -182,17 +187,25 @@ class _MyHomePageState extends State<MyHomePage> {
               onPressed: _makePostRequest,
               child: const Text('Invia richiesta POST'),
             ),
-            ListView.builder(
-                padding: const EdgeInsets.all(8),
-                itemCount: entries.length,
-                shrinkWrap: true,
-                itemBuilder: (BuildContext context, int index) {
-                  return Container(
-                    height: 50,
-                    color: Colors.amber[colorCodes[index]],
-                    child: Center(child: Text('Entry ${entries[index]}')),
-                  );
-                })
+            // for(var lezione in lezioni) Text(.parse(lezione.oraFine))
+            ListView.separated(
+              itemBuilder: (BuildContext context, int index) {
+                return Container(
+                  height: 50,
+                  color: Colors.white,
+                  child: Center(
+                      child: Text(
+                    '${lezioni[index].title}',
+                    style: TextStyle(fontSize: 14),
+                  )),
+                );
+              },
+              separatorBuilder: (context, index) {
+                return Divider();
+              },
+              itemCount: lezioni.length,
+              shrinkWrap: true,
+            ),
           ],
         )));
   }

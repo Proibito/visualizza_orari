@@ -3,7 +3,6 @@ class Event {
   final DateTime oraInizio;
   final DateTime oraFine;
 
-
   const Event(this.title, this.oraInizio, this.oraFine);
 
   @override
